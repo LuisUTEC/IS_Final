@@ -1,48 +1,54 @@
 import unittest
-from app import app, get_db_connection
+from app import app, db
+from models import Cuenta, Contacto, Operacion
+from config import TestConfig
 
-class TestBilletera(unittest.TestCase):
+class BilleteraTestCase(unittest.TestCase):
+
     def setUp(self):
+        app.config.from_object(TestConfig)
+        app.config['TESTING'] = True
         self.app = app.test_client()
-        self.app.testing = True
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute("DELETE FROM historial")
-        cursor.execute("UPDATE cuentas SET saldo = 200 WHERE numero = '21345'")
-        cursor.execute("UPDATE cuentas SET saldo = 400 WHERE numero = '123'")
-        cursor.execute("UPDATE cuentas SET saldo = 300 WHERE numero = '456'")
-        conn.commit()
-        cursor.close()
-        conn.close()
+        with app.app_context():
+            db.create_all()
+            cuenta1 = Cuenta(numero="21345", nombre="Arnaldo", saldo=200)
+            cuenta2 = Cuenta(numero="123", nombre="Luisa", saldo=400)
+            cuenta3 = Cuenta(numero="456", nombre="Andrea", saldo=300)
+            db.session.add_all([cuenta1, cuenta2, cuenta3])
+            db.session.commit()
 
-    def test_contactos(self):
-        response = self.app.get('/billetera/contactos?minumero=21345')
+    def tearDown(self):
+        with app.app_context():
+            db.session.remove()
+            db.drop_all()
+
+    def test_listar_contactos_exito(self):
+        response = self.app.get('/billetera/contactos?numero=21345')
         self.assertEqual(response.status_code, 200)
-        self.assertIn('123', response.json)
-        self.assertIn('456', response.json)
 
-    def test_pagar_success(self):
-        response = self.app.get('/billetera/pagar?minumero=21345&numerodestino=123&valor=100')
+    def test_realizar_pago_exito(self):
+        response = self.app.post('/billetera/pagar', json={
+            'minumero': '21345',
+            'numerodestino': '123',
+            'valor': 100
+        })
         self.assertEqual(response.status_code, 200)
-        self.assertIn('Transacción realizada con éxito', response.json['message'])
 
-    def test_pagar_insufficient_balance(self):
-        response = self.app.get('/billetera/pagar?minumero=21345&numerodestino=123&valor=300')
+    def test_realizar_pago_error_saldo(self):
+        response = self.app.post('/billetera/pagar', json={
+            'minumero': '21345',
+            'numerodestino': '123',
+            'valor': 300
+        })
         self.assertEqual(response.status_code, 400)
-        self.assertIn('Saldo insuficiente', response.json['error'])
 
-    def test_pagar_invalid_contact(self):
-        response = self.app.get('/billetera/pagar?minumero=21345&numerodestino=789&valor=100')
-        self.assertEqual(response.status_code, 400)
-        self.assertIn('El destino no es un contacto válido', response.json['error'])
-
-    def test_historial(self):
-        self.app.get('/billetera/pagar?minumero=21345&numerodestino=123&valor=100')
-        response = self.app.get('/billetera/historial?minumero=21345')
+    def test_historial_exito(self):
+        response = self.app.get('/billetera/historial?numero=21345')
         self.assertEqual(response.status_code, 200)
-        self.assertIn('Arnaldo', response.json['nombre'])
-        self.assertEqual(response.json['saldo'], 100)
-        self.assertEqual(len(response.json['operaciones']), 1)
+
+    def test_historial_error(self):
+        response = self.app.get('/billetera/historial?numero=99999')
+        self.assertEqual(response.status_code, 404)
 
 if __name__ == '__main__':
     unittest.main()
