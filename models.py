@@ -1,6 +1,7 @@
 from datetime import datetime
 from database import db
 
+# Crear tabla de Cuentas
 class Cuenta(db.Model):
     __tablename__ = 'cuentas'
 
@@ -10,6 +11,7 @@ class Cuenta(db.Model):
     saldo = db.Column(db.Float, nullable=False)
     contactos = db.relationship('Contacto', backref='cuenta', lazy=True)
 
+# Crear tabla de Contactos
 class Contacto(db.Model):
     __tablename__ = 'contactos'
 
@@ -18,6 +20,7 @@ class Contacto(db.Model):
     numero = db.Column(db.String(20), nullable=False)
     nombre = db.Column(db.String(50), nullable=False)
 
+# Crear tabla de operaciones
 class Operacion(db.Model):
     __tablename__ = 'operaciones'
 

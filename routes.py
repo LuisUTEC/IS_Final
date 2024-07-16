@@ -6,15 +6,17 @@ app = Flask(__name__)
 app.config.from_object('config.Config')
 db.init_app(app)
 
+# API para obtener los contacots de un usuario en especifico
 @app.route('/billetera/contactos', methods=['GET'])
 def listar_contactos():
-    numero = request.args.get('minumero')
+    numero = request.args.get('min  umero')
     cuenta = Cuenta.query.filter_by(numero=numero).first()
     if cuenta:
         contactos = [{"numero": c.numero, "nombre": c.nombre} for c in cuenta.contactos]
         return jsonify(contactos), 200
     return jsonify({"error": "Cuenta no encontrada"}), 404
 
+# API POST para crear un pago y almacenarlo en la BD
 @app.route('/billetera/pagar', methods=['POST'])
 def realizar_pago():
     data = request.get_json()
@@ -43,6 +45,7 @@ def realizar_pago():
 
     return jsonify({"mensaje": "Pago realizado con éxito"}), 200
 
+# API para obtener el Historial de Transacciones.
 @app.route('/billetera/historial', methods=['GET'])
 def historial():
     numero = request.args.get('minumero')
