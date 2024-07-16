@@ -1,54 +1,43 @@
+from objects import CuentaUsuario,Operacion
 import unittest
-from app import app, db
-from models import Cuenta, Contacto, Operacion
-from config import TestConfig
 
-class BilleteraTestCase(unittest.TestCase):
 
+class TestCuentaUsuario(unittest.TestCase):
+    
     def setUp(self):
-        app.config.from_object(TestConfig)
-        app.config['TESTING'] = True
-        self.app = app.test_client()
-        with app.app_context():
-            db.create_all()
-            cuenta1 = Cuenta(numero="21345", nombre="Arnaldo", saldo=200)
-            cuenta2 = Cuenta(numero="123", nombre="Luisa", saldo=400)
-            cuenta3 = Cuenta(numero="456", nombre="Andrea", saldo=300)
-            db.session.add_all([cuenta1, cuenta2, cuenta3])
-            db.session.commit()
+        self.cuenta1 = CuentaUsuario("Alice", "123456", 1000.0, [("Bob", "654321"), ("Charlie", "789012")])
+        self.cuenta2 = CuentaUsuario("Bob", "654321", 500.0, [("Alice", "123456")])
 
-    def tearDown(self):
-        with app.app_context():
-            db.session.remove()
-            db.drop_all()
+    def test_listarContactos(self):
+        contactos = self.cuenta1.listarContactos()
+        self.assertEqual(contactos, [("Bob", "654321"), ("Charlie", "789012")])
 
-    def test_listar_contactos_exito(self):
-        response = self.app.get('/billetera/contactos?numero=21345')
-        self.assertEqual(response.status_code, 200)
+    def test_transferir(self):
+        result = self.cuenta1.transferir("654321", 200.0)
+        self.assertTrue(result)
+        self.assertEqual(self.cuenta1.Saldo, 800.0)
+        self.assertEqual(self.cuenta2.Saldo, 700.0)
+        
+        result = self.cuenta1.transferir("000000", 100.0)
+        self.assertFalse(result)
 
-    def test_realizar_pago_exito(self):
-        response = self.app.post('/billetera/pagar', json={
-            'minumero': '21345',
-            'numerodestino': '123',
-            'valor': 100
-        })
-        self.assertEqual(response.status_code, 200)
+        result = self.cuenta1.transferir("654321", 10000.0)
+        self.assertFalse(result)
 
-    def test_realizar_pago_error_saldo(self):
-        response = self.app.post('/billetera/pagar', json={
-            'minumero': '21345',
-            'numerodestino': '123',
-            'valor': 300
-        })
-        self.assertEqual(response.status_code, 400)
+    def test_historialOperaciones(self):
+        self.cuenta1.transferir("654321", 200.0)
+        operaciones = self.cuenta1.historialOperaciones()
+        self.assertEqual(len(operaciones), 1)
+        self.assertEqual(operaciones[0].Valor, 200.0)
+        self.assertEqual(operaciones[0].Origen.Numero, "123456")
+        self.assertEqual(operaciones[0].Destino.Numero, "654321")
 
-    def test_historial_exito(self):
-        response = self.app.get('/billetera/historial?numero=21345')
-        self.assertEqual(response.status_code, 200)
-
-    def test_historial_error(self):
-        response = self.app.get('/billetera/historial?numero=99999')
-        self.assertEqual(response.status_code, 404)
+    def test_mostrarHistorial(self):
+        self.cuenta1.transferir("654321", 200.0)
+        historial = self.cuenta1.mostrarHistorial()
+        self.assertEqual(historial['Saldo'], 800.0)
+        self.assertEqual(len(historial['Operaciones']), 1)
+        self.assertEqual(historial['Operaciones'][0].Valor, 200.0)
 
 if __name__ == '__main__':
     unittest.main()
